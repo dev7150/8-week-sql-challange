@@ -14,7 +14,7 @@ SELECT
 	order_time
 FROM pizza_runner.customer_orders;
 
-
+---------------------------------------------
 
 CREATE TEMP TABLE runner_orders_temp AS
 SELECT 
@@ -42,7 +42,7 @@ SELECT
 	  END AS cancellation
 FROM pizza_runner.runner_orders;
 
-
+------------------------------------
 
 ALTER TABLE runner_orders_temp
 ALTER COLUMN pickup_time DATETIME,
