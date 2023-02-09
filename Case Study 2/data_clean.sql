@@ -37,7 +37,7 @@ SELECT
 	  ELSE duration
 	  END AS duration,
   CASE
-	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation ='' THEN ' ' 
+	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation ='' THEN NULL 
 	  ELSE cancellation
 	  END AS cancellation
 FROM pizza_runner.runner_orders;
