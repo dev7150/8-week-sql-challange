@@ -95,4 +95,28 @@ ON c.order_id = r.order_id
 JOIN pizza_runner.pizza_names AS p
 ON c.pizza_id = p.pizza_id
 where r.distance != 0
-group by 1
+group by 1;
+
+
+-- How many Vegetarian and Meatlovers were ordered by each customer?
+with customer_orders as(SELECT 
+  order_id, 
+  customer_id, 
+  pizza_id, 
+  CASE
+	  WHEN exclusions IS null OR exclusions LIKE 'null' THEN ' '
+	  ELSE exclusions
+	  END AS exclusions,
+  CASE
+	  WHEN extras IS NULL or extras LIKE 'null' THEN ' '
+	  ELSE extras
+	  END AS extras,
+	order_time
+FROM pizza_runner.customer_orders
+)
+
+Select customer_id,pn.pizza_name,count(*) from customer_orders co
+join pizza_runner.pizza_names pn
+on co.pizza_id = pn.pizza_id
+group by 1,2
+order by 1,2
