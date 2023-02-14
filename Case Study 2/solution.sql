@@ -9,7 +9,7 @@ FROM pizza_runner.customer_orders
 GROUP BY customer_id;
 
 --3. How many successful orders were delivered by each runner?
-with runner_orders_temp As
+with runner_orders As
 (
 SELECT 
   order_id, 
@@ -19,9 +19,9 @@ SELECT
 	  ELSE pickup_time
 	  END AS pickup_time,
   CASE
-	  WHEN distance LIKE 'null' THEN ' '
-	  WHEN distance LIKE '%km' THEN TRIM('km' from distance)
-	  ELSE distance 
+	  WHEN distance LIKE 'null' THEN 0
+	  WHEN distance LIKE '%km' THEN cast(TRIM('km' from distance) as float)
+	  ELSE cast(distance as float) 
     END AS distance,
   CASE
 	  WHEN duration LIKE 'null' THEN ' '
@@ -31,12 +31,13 @@ SELECT
 	  ELSE duration
 	  END AS duration,
   CASE
-	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation = '' THEN null
+	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation = '' or 
+  		cancellation = ' ' THEN null
 	  ELSE cancellation
 	  END AS cancellation
-FROM pizza_runner.runner_orders)
-
-Select runner_id,count(order_id) from runner_orders_temp
+FROM pizza_runner.runner_orders
+)
+Select runner_id,count(order_id) from runner_orders
 where cancellation is null
 group by 1;
 
@@ -63,7 +64,8 @@ SELECT
 	  ELSE duration
 	  END AS duration,
   CASE
-	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation = '' THEN null
+	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation = '' or 
+  		cancellation = ' ' THEN null
 	  ELSE cancellation
 	  END AS cancellation
 FROM pizza_runner.runner_orders
@@ -75,53 +77,29 @@ SELECT
   customer_id, 
   pizza_id, 
   CASE
-	  WHEN exclusions IS null OR exclusions LIKE 'null' THEN ' '
+	  WHEN exclusions IS null OR exclusions LIKE 'null' or exclusions ='' or exclusions=' ' THEN null
 	  ELSE exclusions
 	  END AS exclusions,
   CASE
-	  WHEN extras IS NULL or extras LIKE 'null' THEN ' '
+	  WHEN extras IS NULL or extras LIKE 'null' or extras ='' or extras=' ' THEN null
 	  ELSE extras
 	  END AS extras,
 	order_time
 FROM pizza_runner.customer_orders
 )
-
-
-Select p.pizza_name, 
-COUNT(c.pizza_id) AS delivered_pizza_count
-from customer_orders c
-JOIN runner_orders AS r
-ON c.order_id = r.order_id
-JOIN pizza_runner.pizza_names AS p
-ON c.pizza_id = p.pizza_id
-where r.distance != 0
-group by 1;
-
-
--- How many Vegetarian and Meatlovers were ordered by each customer?
-with customer_orders as(SELECT 
-  order_id, 
-  customer_id, 
-  pizza_id, 
-  CASE
-	  WHEN exclusions IS null OR exclusions LIKE 'null' THEN ' '
-	  ELSE exclusions
-	  END AS exclusions,
-  CASE
-	  WHEN extras IS NULL or extras LIKE 'null' THEN ' '
-	  ELSE extras
-	  END AS extras,
-	order_time
-FROM pizza_runner.customer_orders
+,ranked as(
+Select co.order_id as order_id, count(pizza_id) as pizza_count,rank() over (order by count(pizza_id) desc) as rank
+from customer_orders co
+join runner_orders ro
+on co.order_id = ro.order_id
+group by 1
 )
 
-Select customer_id,pn.pizza_name,count(*) from customer_orders co
-join pizza_runner.pizza_names pn
-on co.pizza_id = pn.pizza_id
-group by 1,2
-order by 1,2
+Select order_id, pizza_count from ranked
+where rank = 1
 
--- What was the maximum number of pizzas delivered in a single order?
+
+-- For each customer, how many delivered pizzas had at least 1 change and how many had no changes?
 with runner_orders As
 (
 SELECT 
@@ -144,7 +122,8 @@ SELECT
 	  ELSE duration
 	  END AS duration,
   CASE
-	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation = '' THEN null
+	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation = '' or 
+  		cancellation = ' ' THEN null
 	  ELSE cancellation
 	  END AS cancellation
 FROM pizza_runner.runner_orders
@@ -156,23 +135,187 @@ SELECT
   customer_id, 
   pizza_id, 
   CASE
-	  WHEN exclusions IS null OR exclusions LIKE 'null' THEN ' '
+	  WHEN exclusions IS null OR exclusions LIKE 'null' or exclusions ='' or exclusions=' ' THEN null
 	  ELSE exclusions
 	  END AS exclusions,
   CASE
-	  WHEN extras IS NULL or extras LIKE 'null' THEN ' '
+	  WHEN extras IS NULL or extras LIKE 'null' or extras ='' or extras=' ' THEN null
 	  ELSE extras
 	  END AS extras,
 	order_time
 FROM pizza_runner.customer_orders
 )
-,ranked as(
-Select co.order_id as order_id, count(pizza_id) as pizza_count,rank() over (order by count(pizza_id) desc) as rank
+Select customer_id,
+sum(case when exclusions is not null or extras is not null then 1 else 0 end) as min_1_change,
+sum(case when exclusions is null and extras is null then 1 else 0 end) as no_change
 from customer_orders co
 join runner_orders ro
 on co.order_id = ro.order_id
+where cancellation is null
 group by 1
-)
+order by 1
 
-Select order_id, pizza_count from ranked
-where rank = 1
+-- How many pizzas were delivered that had both exclusions and extras?
+with runner_orders As
+(
+SELECT 
+  order_id, 
+  runner_id,  
+  CASE
+	  WHEN pickup_time LIKE 'null' THEN ' '
+	  ELSE pickup_time
+	  END AS pickup_time,
+  CASE
+	  WHEN distance LIKE 'null' THEN 0
+	  WHEN distance LIKE '%km' THEN cast(TRIM('km' from distance) as float)
+	  ELSE cast(distance as float) 
+    END AS distance,
+  CASE
+	  WHEN duration LIKE 'null' THEN ' '
+	  WHEN duration LIKE '%mins' THEN TRIM('mins' from duration)
+	  WHEN duration LIKE '%minute' THEN TRIM('minute' from duration)
+	  WHEN duration LIKE '%minutes' THEN TRIM('minutes' from duration)
+	  ELSE duration
+	  END AS duration,
+  CASE
+	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation = '' or 
+  		cancellation = ' ' THEN null
+	  ELSE cancellation
+	  END AS cancellation
+FROM pizza_runner.runner_orders
+),
+customer_orders as
+(
+SELECT 
+  order_id, 
+  customer_id, 
+  pizza_id, 
+  CASE
+	  WHEN exclusions IS null OR exclusions LIKE 'null' or exclusions ='' or exclusions=' ' THEN null
+	  ELSE exclusions
+	  END AS exclusions,
+  CASE
+	  WHEN extras IS NULL or extras LIKE 'null' or extras ='' or extras=' ' THEN null
+	  ELSE extras
+	  END AS extras,
+	order_time
+FROM pizza_runner.customer_orders
+)
+Select 
+sum(case when exclusions is not null and extras is not null then 1 else 0 end) 
+from customer_orders co
+join runner_orders ro
+on co.order_id = ro.order_id
+where cancellation is null
+
+
+-- What was the total volume of pizzas ordered for each hour of the day?
+with runner_orders As
+(
+SELECT 
+  order_id, 
+  runner_id,  
+  CASE
+	  WHEN pickup_time LIKE 'null' THEN ' '
+	  ELSE pickup_time
+	  END AS pickup_time,
+  CASE
+	  WHEN distance LIKE 'null' THEN 0
+	  WHEN distance LIKE '%km' THEN cast(TRIM('km' from distance) as float)
+	  ELSE cast(distance as float) 
+    END AS distance,
+  CASE
+	  WHEN duration LIKE 'null' THEN ' '
+	  WHEN duration LIKE '%mins' THEN TRIM('mins' from duration)
+	  WHEN duration LIKE '%minute' THEN TRIM('minute' from duration)
+	  WHEN duration LIKE '%minutes' THEN TRIM('minutes' from duration)
+	  ELSE duration
+	  END AS duration,
+  CASE
+	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation = '' or 
+  		cancellation = ' ' THEN null
+	  ELSE cancellation
+	  END AS cancellation
+FROM pizza_runner.runner_orders
+),
+customer_orders as
+(
+SELECT 
+  order_id, 
+  customer_id, 
+  pizza_id, 
+  CASE
+	  WHEN exclusions IS null OR exclusions LIKE 'null' or exclusions ='' or exclusions=' ' THEN null
+	  ELSE exclusions
+	  END AS exclusions,
+  CASE
+	  WHEN extras IS NULL or extras LIKE 'null' or extras ='' or extras=' ' THEN null
+	  ELSE extras
+	  END AS extras,
+	order_time
+FROM pizza_runner.customer_orders
+)
+Select 
+extract(hour from order_time),
+-- DATEPART(HOUR, order_time) AS hour_of_day, //TSQL
+count(pizza_id) 
+from customer_orders co
+group by 1
+order by 1
+
+-- What was the volume of orders for each day of the week?
+with runner_orders As
+(
+SELECT 
+  order_id, 
+  runner_id,  
+  CASE
+	  WHEN pickup_time LIKE 'null' THEN ' '
+	  ELSE pickup_time
+	  END AS pickup_time,
+  CASE
+	  WHEN distance LIKE 'null' THEN 0
+	  WHEN distance LIKE '%km' THEN cast(TRIM('km' from distance) as float)
+	  ELSE cast(distance as float) 
+    END AS distance,
+  CASE
+	  WHEN duration LIKE 'null' THEN ' '
+	  WHEN duration LIKE '%mins' THEN TRIM('mins' from duration)
+	  WHEN duration LIKE '%minute' THEN TRIM('minute' from duration)
+	  WHEN duration LIKE '%minutes' THEN TRIM('minutes' from duration)
+	  ELSE duration
+	  END AS duration,
+  CASE
+	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation = '' or 
+  		cancellation = ' ' THEN null
+	  ELSE cancellation
+	  END AS cancellation
+FROM pizza_runner.runner_orders
+),
+customer_orders as
+(
+SELECT 
+  order_id, 
+  customer_id, 
+  pizza_id, 
+  CASE
+	  WHEN exclusions IS null OR exclusions LIKE 'null' or exclusions ='' or exclusions=' ' THEN null
+	  ELSE exclusions
+	  END AS exclusions,
+  CASE
+	  WHEN extras IS NULL or extras LIKE 'null' or extras ='' or extras=' ' THEN null
+	  ELSE extras
+	  END AS extras,
+	order_time
+FROM pizza_runner.customer_orders
+)
+Select 
+to_char((order_time::date)+2,'DAY'),
+-- FORMAT(DATEADD(DAY, 2, order_time),'dddd') AS day_of_week, -- add 2 to adjust 1st day of the week as Monday
+count(pizza_id) 
+from customer_orders co
+group by 1
+order by 1
+
+
+
