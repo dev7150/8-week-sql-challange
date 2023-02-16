@@ -323,7 +323,7 @@ order by 1
 Select count(runner_id),
 date_part('week' , registration_date)
 from pizza_runner.runners
-group by 2
+group by 2;
 
 
 -- 2. What was the average time in minutes it took for each runner to arrive
