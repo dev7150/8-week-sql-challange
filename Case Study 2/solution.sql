@@ -385,4 +385,59 @@ on ro.order_id = co.order_id
 Select runner_id,round(cast(extract(epoch from avg(pickup_min))/60 AS NUMERIC),2) as avg_time_taken
 from time_taken
 where extract(epoch from pickup_min) > 1
-group by 1
+group by 1;
+
+-- Is there any relationship between the number of pizzas and how long the order takes to prepare?
+with runner_orders As
+(
+SELECT 
+  order_id, 
+  runner_id,  
+  CASE
+	  WHEN pickup_time LIKE 'null' THEN ''
+	  ELSE pickup_time
+	  END AS pickup_time,
+  CASE
+	  WHEN distance LIKE 'null' THEN 0
+	  WHEN distance LIKE '%km' THEN cast(TRIM('km' from distance) as float)
+	  ELSE cast(distance as float) 
+    END AS distance,
+  CASE
+	  WHEN duration LIKE 'null' THEN ' '
+	  WHEN duration LIKE '%mins' THEN TRIM('mins' from duration)
+	  WHEN duration LIKE '%minute' THEN TRIM('minute' from duration)
+	  WHEN duration LIKE '%minutes' THEN TRIM('minutes' from duration)
+	  ELSE duration
+	  END AS duration,
+  CASE
+	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation = '' or 
+  		cancellation = ' ' THEN null
+	  ELSE cancellation
+	  END AS cancellation
+FROM pizza_runner.runner_orders
+),
+customer_orders as
+(
+SELECT 
+  order_id, 
+  customer_id, 
+  pizza_id, 
+  CASE
+	  WHEN exclusions IS null OR exclusions LIKE 'null' or exclusions ='' or exclusions=' ' THEN null
+	  ELSE exclusions
+	  END AS exclusions,
+  CASE
+	  WHEN extras IS NULL or extras LIKE 'null' or extras ='' or extras=' ' THEN null
+	  ELSE extras
+	  END AS extras,
+	order_time
+FROM pizza_runner.customer_orders)
+Select co.order_id,
+count(pizza_id),
+ (to_timestamp(ro.pickup_time, 'YYYY-MM-DD HH24:MI:SS') - co.order_time::timestamp) as pickup_min
+ from customer_orders co
+ join runner_orders ro
+ on co.order_id = ro.order_id
+  where distance != 0
+ group by 1,3
+ order by 2 desc
