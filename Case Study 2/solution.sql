@@ -387,6 +387,7 @@ from time_taken
 where extract(epoch from pickup_min) > 1
 group by 1;
 
+
 -- Is there any relationship between the number of pizzas and how long the order takes to prepare?
 with runner_orders As
 (
