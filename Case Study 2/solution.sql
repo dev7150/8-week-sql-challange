@@ -441,7 +441,7 @@ count(pizza_id),
  on co.order_id = ro.order_id
   where distance != 0
  group by 1,3
- order by 2 desc
+ order by 2 desc;
 
  -- What was the average distance travelled for each customer?
 with runner_orders As
@@ -495,4 +495,162 @@ from customer_orders co
 join runner_orders ro
 on ro.order_id = co.order_id
 where distance != 0
+group by 1;
+
+-- What was the difference between the longest and shortest delivery times for all orders?
+with runner_orders As
+(
+SELECT 
+  order_id, 
+  runner_id,  
+  CASE
+	  WHEN pickup_time LIKE 'null' THEN ''
+	  ELSE pickup_time
+	  END AS pickup_time,
+  CASE
+	  WHEN distance LIKE 'null' THEN 0
+	  WHEN distance LIKE '%km' THEN cast(TRIM('km' from distance) as float)
+	  ELSE cast(distance as float) 
+    END AS distance,
+  CASE
+	  WHEN duration LIKE 'null' THEN ' '
+	  WHEN duration LIKE '%mins' THEN TRIM('mins' from duration)
+	  WHEN duration LIKE '%minute' THEN TRIM('minute' from duration)
+	  WHEN duration LIKE '%minutes' THEN TRIM('minutes' from duration)
+	  ELSE duration
+	  END AS duration,
+  CASE
+	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation = '' or 
+  		cancellation = ' ' THEN null
+	  ELSE cancellation
+	  END AS cancellation
+FROM pizza_runner.runner_orders
+),
+customer_orders as
+(
+SELECT 
+  order_id, 
+  customer_id, 
+  pizza_id, 
+  CASE
+	  WHEN exclusions IS null OR exclusions LIKE 'null' or exclusions ='' or exclusions=' ' THEN null
+	  ELSE exclusions
+	  END AS exclusions,
+  CASE
+	  WHEN extras IS NULL or extras LIKE 'null' or extras ='' or extras=' ' THEN null
+	  ELSE extras
+	  END AS extras,
+	order_time
+FROM pizza_runner.customer_orders)
+
+Select 
+max(duration::numeric) - min(duration::numeric) as time_diff
+from runner_orders 
+where distance != 0;
+
+-- What was the average speed for each runner for each delivery and do you notice any trend for these values?
+with runner_orders As
+(
+SELECT 
+  order_id, 
+  runner_id,  
+  CASE
+	  WHEN pickup_time LIKE 'null' THEN ''
+	  ELSE pickup_time
+	  END AS pickup_time,
+  CASE
+	  WHEN distance LIKE 'null' THEN 0
+	  WHEN distance LIKE '%km' THEN cast(TRIM('km' from distance) as float)
+	  ELSE cast(distance as float) 
+    END AS distance,
+  CASE
+	  WHEN duration LIKE 'null' THEN ' '
+	  WHEN duration LIKE '%mins' THEN TRIM('mins' from duration)
+	  WHEN duration LIKE '%minute' THEN TRIM('minute' from duration)
+	  WHEN duration LIKE '%minutes' THEN TRIM('minutes' from duration)
+	  ELSE duration
+	  END AS duration,
+  CASE
+	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation = '' or 
+  		cancellation = ' ' THEN null
+	  ELSE cancellation
+	  END AS cancellation
+FROM pizza_runner.runner_orders
+),
+customer_orders as
+(
+SELECT 
+  order_id, 
+  customer_id, 
+  pizza_id, 
+  CASE
+	  WHEN exclusions IS null OR exclusions LIKE 'null' or exclusions ='' or exclusions=' ' THEN null
+	  ELSE exclusions
+	  END AS exclusions,
+  CASE
+	  WHEN extras IS NULL or extras LIKE 'null' or extras ='' or extras=' ' THEN null
+	  ELSE extras
+	  END AS extras,
+	order_time
+FROM pizza_runner.customer_orders)
+
+Select runner_id,
+ro.order_id,
+count(pizza_id) as pizza_count,
+round(avg(distance::numeric/duration::numeric)*60,2) as avg_speed
+from runner_orders ro
+join customer_orders co
+on co.order_id = ro.order_id
+where distance != 0
+group by 1,2
+
+-- What is the successful delivery percentage for each runner?
+with runner_orders As
+(
+SELECT 
+  order_id, 
+  runner_id,  
+  CASE
+	  WHEN pickup_time LIKE 'null' THEN ''
+	  ELSE pickup_time
+	  END AS pickup_time,
+  CASE
+	  WHEN distance LIKE 'null' THEN 0
+	  WHEN distance LIKE '%km' THEN cast(TRIM('km' from distance) as float)
+	  ELSE cast(distance as float) 
+    END AS distance,
+  CASE
+	  WHEN duration LIKE 'null' THEN ' '
+	  WHEN duration LIKE '%mins' THEN TRIM('mins' from duration)
+	  WHEN duration LIKE '%minute' THEN TRIM('minute' from duration)
+	  WHEN duration LIKE '%minutes' THEN TRIM('minutes' from duration)
+	  ELSE duration
+	  END AS duration,
+  CASE
+	  WHEN cancellation IS NULL or cancellation LIKE 'null' or cancellation = '' or 
+  		cancellation = ' ' THEN null
+	  ELSE cancellation
+	  END AS cancellation
+FROM pizza_runner.runner_orders
+),
+customer_orders as
+(
+SELECT 
+  order_id, 
+  customer_id, 
+  pizza_id, 
+  CASE
+	  WHEN exclusions IS null OR exclusions LIKE 'null' or exclusions ='' or exclusions=' ' THEN null
+	  ELSE exclusions
+	  END AS exclusions,
+  CASE
+	  WHEN extras IS NULL or extras LIKE 'null' or extras ='' or extras=' ' THEN null
+	  ELSE extras
+	  END AS extras,
+	order_time
+FROM pizza_runner.customer_orders)
+
+Select runner_id,
+100*sum(case when distance = 0 then 0 else 1 end)/count(pickup_time) as success
+from runner_orders ro
 group by 1
