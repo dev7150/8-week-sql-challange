@@ -602,7 +602,7 @@ from runner_orders ro
 join customer_orders co
 on co.order_id = ro.order_id
 where distance != 0
-group by 1,2
+group by 1,2;
 
 -- What is the successful delivery percentage for each runner?
 with runner_orders As
@@ -653,4 +653,4 @@ FROM pizza_runner.customer_orders)
 Select runner_id,
 100*sum(case when distance = 0 then 0 else 1 end)/count(pickup_time) as success
 from runner_orders ro
-group by 1
+group by 1;
