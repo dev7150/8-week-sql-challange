@@ -64,3 +64,39 @@ Select unnest(string_to_array(extras,',')) as a,
 count(extras)
 from customer_orders
 group by 1
+
+-- What was the most common exclusion?
+with customer_orders as
+(
+SELECT 
+  order_id, 
+  customer_id, 
+  pizza_id, 
+  CASE
+	  WHEN exclusions IS null OR exclusions LIKE 'null' or exclusions ='' or exclusions=' ' THEN null
+	  ELSE exclusions
+	  END AS exclusions,
+  CASE
+	  WHEN extras IS NULL or extras LIKE 'null' or extras ='' or extras=' ' THEN null
+	  ELSE extras
+	  END AS extras,
+	order_time
+FROM pizza_runner.customer_orders),
+toppings_cte AS (
+SELECT
+  pizza_id,
+  REGEXP_SPLIT_TO_TABLE(toppings, '[,\s]+')::INTEGER AS topping_id
+FROM pizza_runner.pizza_recipes
+)
+
+Select exclusions, topping_name,
+count(*)
+FROM toppings_cte t
+INNER JOIN pizza_runner.pizza_toppings pt
+  ON t.topping_id = pt.topping_id
+join customer_orders co
+on co.pizza_id = t.pizza_id
+where exclusions is not null
+GROUP BY 1,2
+ORDER BY 2 DESC
+limit 1;
